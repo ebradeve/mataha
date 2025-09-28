@@ -18,6 +18,13 @@ type MazeCell = {
     top: boolean; right: boolean; bottom: boolean; left: boolean;
     visited: boolean;
 };
+type Particle = {
+    x: number; y: number;
+    vx: number; vy: number;
+    size: number;
+    color: string;
+    life: number;
+};
 
 const PLAYER_COLOR = '#007BFF';
 const EXIT_COLOR = '#8B4513';
@@ -28,20 +35,24 @@ const TOTAL_STARS = 3;
 
 let level = 1;
 let maze: MazeCell[][];
-let player: Position; // Logical grid position
-let playerRenderPos: Position; // Rendered position (can be float for animation)
+let player: Position;
+let playerRenderPos: Position;
 let exit: Position;
 let stars: Position[] = [];
 let collectedStars = 0;
 let cellSize = 20;
 let mazeSize = 10;
-let gameState: 'start' | 'playing' | 'won' = 'start';
+let gameState: 'start' | 'playing' | 'celebrating' = 'start';
 let isAnimating = false;
-let currentDirection = { dx: 0, dy: 0 };
-let desiredDirection = { dx: 0, dy: 0 };
 let frameCount = 0;
 let audioCtx: AudioContext | null = null;
-
+let confettiParticles: Particle[] = [];
+const keysDown = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+};
 
 function initAudio() {
     if (audioCtx) return;
@@ -115,9 +126,8 @@ function setupLevel(newLevel: number) {
     level = newLevel;
     gameState = 'playing';
     isAnimating = false;
-    currentDirection = { dx: 0, dy: 0 };
-    desiredDirection = { dx: 0, dy: 0 };
     collectedStars = 0;
+    confettiParticles = [];
     
     if (level <= 2) mazeSize = 10;
     else if (level <= 5) mazeSize = 15;
@@ -175,7 +185,6 @@ function generateMaze() {
     }
 }
 
-
 function findShortestPath(startPos: Position, endPos: Position): Position[] {
     const queue: Position[] = [startPos];
     const visited = new Set<string>([`${startPos.x},${startPos.y}`]);
@@ -184,7 +193,6 @@ function findShortestPath(startPos: Position, endPos: Position): Position[] {
     while (queue.length > 0) {
         const current = queue.shift()!;
         if (current.x === endPos.x && current.y === endPos.y) {
-            // Reconstruct path
             const path: Position[] = [];
             let curr: Position | undefined = endPos;
             while (curr) {
@@ -211,27 +219,60 @@ function findShortestPath(startPos: Position, endPos: Position): Position[] {
             }
         }
     }
-    return []; // No path found
+    return [];
 }
-
 
 function generateStars() {
     stars = [];
     const solutionPath = findShortestPath({ x: 0, y: 0 }, exit);
-    if (solutionPath.length <= 2) {
-        return; // Path is too short, no stars
-    }
+    if (solutionPath.length <= 2) return;
     
-    // Remove start and end from potential star locations
     const possiblePositions = solutionPath.slice(1, -1);
     
-    // Shuffle and pick
     for (let i = possiblePositions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [possiblePositions[i], possiblePositions[j]] = [possiblePositions[j], possiblePositions[i]];
     }
 
     stars = possiblePositions.slice(0, TOTAL_STARS);
+}
+
+function createConfetti() {
+    confettiParticles = [];
+    const particleCount = 100;
+    const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+    for (let i = 0; i < particleCount; i++) {
+        confettiParticles.push({
+            x: playerRenderPos.x * cellSize + cellSize / 2,
+            y: playerRenderPos.y * cellSize + cellSize / 2,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8 - 5,
+            size: Math.random() * 5 + 2,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            life: 120,
+        });
+    }
+}
+
+function updateConfetti() {
+    for (let i = confettiParticles.length - 1; i >= 0; i--) {
+        const p = confettiParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.1; // Gravity
+        p.life--;
+        if (p.life <= 0) {
+            confettiParticles.splice(i, 1);
+        }
+    }
+}
+
+function drawConfetti() {
+    if (!ctx) return;
+    for (const p of confettiParticles) {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+    }
 }
 
 function drawStar(cx: number, cy: number, spikes: number, outerRadius: number, innerRadius: number) {
@@ -263,7 +304,6 @@ function draw() {
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw maze
     ctx.strokeStyle = WALL_COLOR;
     ctx.lineWidth = 4;
     for (let y = 0; y < mazeSize; y++) {
@@ -299,13 +339,18 @@ function draw() {
     
     ctx.fillStyle = PLAYER_COLOR;
     let breath = 0;
-    if (currentDirection.dx === 0 && currentDirection.dy === 0 && !isAnimating) {
+    const isMoving = keysDown.up || keysDown.down || keysDown.left || keysDown.right;
+    if (!isMoving && !isAnimating) {
         breath = Math.sin(frameCount * 0.1) * (cellSize * 0.04);
     }
     const playerRadius = cellSize / 3 + breath;
     ctx.beginPath();
     ctx.arc(playerRenderPos.x * cellSize + cellSize / 2, playerRenderPos.y * cellSize + cellSize / 2, playerRadius, 0, 2 * Math.PI);
     ctx.fill();
+
+    if (gameState === 'celebrating') {
+        drawConfetti();
+    }
 }
 
 function canMove(pos: Position, dir: { dx: number, dy: number }): boolean {
@@ -320,20 +365,6 @@ function canMove(pos: Position, dir: { dx: number, dy: number }): boolean {
     return false;
 }
 
-function setDirection(dx: number, dy: number) {
-    initAudio();
-    if (gameState !== 'playing' || (dx === 0 && dy === 0)) return;
-    
-    const isOpposite = dx === -currentDirection.dx && dy === -currentDirection.dy;
-    // Allow reversing direction immediately
-    if (isOpposite) {
-        currentDirection = { dx, dy };
-    } else {
-        desiredDirection = { dx, dy };
-    }
-}
-
-
 function checkGameStatus() {
     const starIndex = stars.findIndex(star => star.x === player.x && star.y === player.y);
     if (starIndex > -1) {
@@ -346,81 +377,113 @@ function checkGameStatus() {
         }
     }
 
-    if (player.x === exit.x && player.y === exit.y) {
-        gameState = 'won';
-        currentDirection = { dx: 0, dy: 0 };
-        desiredDirection = { dx: 0, dy: 0 };
+    if (gameState === 'playing' && player.x === exit.x && player.y === exit.y) {
+        gameState = 'celebrating';
         messageDisplay.textContent = 'لقد فزت! 🎉';
         playWinSound();
-        setTimeout(() => setupLevel(level + 1), 1500);
+        createConfetti();
+        setTimeout(() => {
+            if (gameState === 'celebrating') {
+               setupLevel(level + 1);
+            }
+        }, 2000);
     }
 }
 
 function update() {
+    frameCount++;
+
+    if (gameState === 'celebrating') {
+        updateConfetti();
+        return;
+    }
     if (gameState !== 'playing') return;
 
-    // Animate movement from render position to logical position
     if (isAnimating) {
         const rdx = player.x - playerRenderPos.x;
         const rdy = player.y - playerRenderPos.y;
-        
-        const dist = Math.sqrt(rdx*rdx + rdy*rdy);
+        const dist = Math.sqrt(rdx * rdx + rdy * rdy);
 
         if (dist < 0.01) {
             playerRenderPos.x = player.x;
             playerRenderPos.y = player.y;
             isAnimating = false;
+            checkGameStatus();
         } else {
             playerRenderPos.x += rdx * ANIMATION_SPEED;
             playerRenderPos.y += rdy * ANIMATION_SPEED;
         }
-        return; // Don't process new moves until animation is done
+        return;
     }
     
-    // When not animating a step, check for next logical move
+    const moveDir = { dx: 0, dy: 0 };
+    if (keysDown.up) moveDir.dy = -1;
+    else if (keysDown.down) moveDir.dy = 1;
+    else if (keysDown.left) moveDir.dx = -1;
+    else if (keysDown.right) moveDir.dx = 1;
 
-    // If we've reached a junction or a wall, check for a new desired direction
-    if (canMove(player, desiredDirection)) {
-        currentDirection = { ...desiredDirection };
-        // desiredDirection = { dx: 0, dy: 0 }; // Consume the direction
-    }
-
-    // Try to move in the current direction
-    if (canMove(player, currentDirection)) {
-        player.x += currentDirection.dx;
-        player.y += currentDirection.dy;
+    if ((moveDir.dx !== 0 || moveDir.dy !== 0) && canMove(player, moveDir)) {
+        player.x += moveDir.dx;
+        player.y += moveDir.dy;
         isAnimating = true;
         playMoveSound();
         checkGameStatus();
-    } else {
-        // Stop if we hit a wall
-        currentDirection = { dx: 0, dy: 0 };
     }
 }
 
 function gameLoop() {
-    frameCount++;
     update();
     draw();
     requestAnimationFrame(gameLoop);
 }
 
+function handleKeyDown(key: string) {
+    switch (key) {
+        case 'ArrowUp': case 'w': keysDown.up = true; break;
+        case 'ArrowDown': case 's': keysDown.down = true; break;
+        case 'ArrowLeft': case 'a': keysDown.left = true; break;
+        case 'ArrowRight': case 'd': keysDown.right = true; break;
+    }
+}
+
+function handleKeyUp(key: string) {
+    switch (key) {
+        case 'ArrowUp': case 'w': keysDown.up = false; break;
+        case 'ArrowDown': case 's': keysDown.down = false; break;
+        case 'ArrowLeft': case 'a': keysDown.left = false; break;
+        case 'ArrowRight': case 'd': keysDown.right = false; break;
+    }
+}
+
 window.addEventListener('keydown', (e) => {
     if (gameState === 'playing') {
         e.preventDefault();
-        switch (e.key) {
-            case 'ArrowUp': case 'w': setDirection(0, -1); break;
-            case 'ArrowDown': case 's': setDirection(0, 1); break;
-            case 'ArrowLeft': case 'a': setDirection(-1, 0); break;
-            case 'ArrowRight': case 'd': setDirection(1, 0); break;
-        }
+        initAudio();
+        handleKeyDown(e.key);
+    }
+});
+window.addEventListener('keyup', (e) => {
+    if (gameState === 'playing') {
+        e.preventDefault();
+        handleKeyUp(e.key);
     }
 });
 
-upButton?.addEventListener('click', () => setDirection(0, -1));
-downButton?.addEventListener('click', () => setDirection(0, 1));
-leftButton?.addEventListener('click', () => setDirection(-1, 0));
-rightButton?.addEventListener('click', () => setDirection(1, 0));
+function setupButtonEvents(button: HTMLElement | null, direction: 'up' | 'down' | 'left' | 'right') {
+    if (!button) return;
+    button.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        initAudio();
+        keysDown[direction] = true;
+    });
+    button.addEventListener('pointerup', () => keysDown[direction] = false);
+    button.addEventListener('pointerleave', () => keysDown[direction] = false);
+}
+
+setupButtonEvents(upButton, 'up');
+setupButtonEvents(downButton, 'down');
+setupButtonEvents(leftButton, 'left');
+setupButtonEvents(rightButton, 'right');
 
 window.addEventListener('resize', () => {
     if (gameState === 'playing' || gameState === 'start') {
