@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>متاهة كرم</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4CAF50"/>
+    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png">
+</head>
+<body>
+    <div id="game-container">
+        <h1>متاهة كرم</h1>
+        <div id="info-bar">
+            <span id="level-display">المستوى: 1</span>
+            <span id="message-display">اعثر على المخرج!</span>
+            <span id="star-display"></span>
+        </div>
+        <div id="canvas-wrapper">
+            <canvas id="maze-canvas" width="600" height="600"></canvas>
+        </div>
+        <div id="controls-container">
+            <button id="up-btn" aria-label="تحرك للأعلى">↑</button>
+            <button id="left-btn" aria-label="تحرك لليسار">←</button>
+            <button id="down-btn" aria-label="تحرك للأسفل">↓</button>
+            <button id="right-btn" aria-label="تحرك لليمين">→</button>
+        </div>
+    </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('SW registered: ', registration);
+                }).catch(registrationError => {
+                    console.log('SW registration failed: ', registrationError);
+                });
+            });
+        }
+    </script>
+    <script type="module" src="index.js"></script>
+</body>
+</html>
