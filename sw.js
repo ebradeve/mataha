@@ -1,4 +1,4 @@
-const CACHE_NAME = 'maze-game-cache-v2'; // Bumped version to ensure update
+const CACHE_NAME = 'maze-game-cache-v3'; // Bumped version to ensure update
 const urlsToCache = [
     '/',
     '/index.html',

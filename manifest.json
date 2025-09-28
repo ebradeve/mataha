@@ -2,7 +2,7 @@
   "name": "متاهة كرم",
   "short_name": "كرم",
   "description": "ساعد كرم في إيجاد مخرج المتاهة وجمع النجوم!",
-  "start_url": ".",
+  "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#FFFFFF",
   "theme_color": "#4CAF50",
@@ -11,12 +11,14 @@
     {
       "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIiBzdHJva2U9IiM0Q0FGNTAiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHBhdGggZD0iTTEwIDEwIEggOTAgViA5MCBIIDEwIFoiIHN0cm9rZT0ibm9uZSIgZmlsbD0iI0ZGRkZGRiIvPjxwYXRoIGQ9Ik0xMCAxMCBIIDkwIFYgOTAgSCAxMCBWIDEwIi8+PHBhdGggZD0iTTEwIDMwIEggNzAgViAxMCIvPjxwYXRoIGQ9Ik0zMCAzMCBWIDUwIEggOTAiLz48cGF0aCBkPSJNMTAgNzAgSCA1MCBWIDkwIi8+PHBhdGggZD0iTTcwIDcwIEggOTAiLz48L3N2Zz4=",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     },
     {
       "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIiBzdHJva2U9IiM0Q0FGNTAiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHBhdGggZD0iTTEwIDEwIEggOTAgViA5MCBIIDEwIFoiIHN0cm9rZT0ibm9uZSIgZmlsbD0iI0ZGRkZGRiIvPjxwYXRoIGQ9Ik0xMCAxMCBIIDkwIFYgOTAgSCAxMCBWIDEwIi8+PHBhdGggZD0iTTEwIDMwIEggNzAgViAxMCIvPjxwYXRoIGQ9Ik0zMCAzMCBWIDUwIEggOTAiLz48cGF0aCBkPSJNMTAgNzAgSCA1MCBWIDkwIi8+PHBhdGggZD0iTTcwIDcwIEggOTAiLz48L3N2Zz4=",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
