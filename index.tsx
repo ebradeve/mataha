@@ -322,9 +322,17 @@ function canMove(pos: Position, dir: { dx: number, dy: number }): boolean {
 
 function setDirection(dx: number, dy: number) {
     initAudio();
-    if (gameState !== 'playing') return;
-    desiredDirection = { dx, dy };
+    if (gameState !== 'playing' || (dx === 0 && dy === 0)) return;
+    
+    const isOpposite = dx === -currentDirection.dx && dy === -currentDirection.dy;
+    // Allow reversing direction immediately
+    if (isOpposite) {
+        currentDirection = { dx, dy };
+    } else {
+        desiredDirection = { dx, dy };
+    }
 }
+
 
 function checkGameStatus() {
     const starIndex = stars.findIndex(star => star.x === player.x && star.y === player.y);
@@ -349,6 +357,8 @@ function checkGameStatus() {
 }
 
 function update() {
+    if (gameState !== 'playing') return;
+
     // Animate movement from render position to logical position
     if (isAnimating) {
         const rdx = player.x - playerRenderPos.x;
@@ -368,24 +378,23 @@ function update() {
     }
     
     // When not animating a step, check for next logical move
-    if (gameState === 'playing') {
-        // Check if we should change direction based on user input
-        const isOpposite = desiredDirection.dx === -currentDirection.dx && desiredDirection.dy === -currentDirection.dy;
-        if ((desiredDirection.dx !== 0 || desiredDirection.dy !== 0) && (canMove(player, desiredDirection) || isOpposite)) {
-            currentDirection = { ...desiredDirection };
-        }
-        
-        // Try to move in the current direction
-        if (canMove(player, currentDirection)) {
-            player.x += currentDirection.dx;
-            player.y += currentDirection.dy;
-            isAnimating = true;
-            playMoveSound();
-            checkGameStatus();
-        } else {
-            // Stop if we hit a wall or are at a junction we can't pass through
-            currentDirection = { dx: 0, dy: 0 };
-        }
+
+    // If we've reached a junction or a wall, check for a new desired direction
+    if (canMove(player, desiredDirection)) {
+        currentDirection = { ...desiredDirection };
+        // desiredDirection = { dx: 0, dy: 0 }; // Consume the direction
+    }
+
+    // Try to move in the current direction
+    if (canMove(player, currentDirection)) {
+        player.x += currentDirection.dx;
+        player.y += currentDirection.dy;
+        isAnimating = true;
+        playMoveSound();
+        checkGameStatus();
+    } else {
+        // Stop if we hit a wall
+        currentDirection = { dx: 0, dy: 0 };
     }
 }
 

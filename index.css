@@ -99,6 +99,7 @@ h1 {
     -webkit-tap-highlight-color: transparent;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     transition: transform 0.1s ease, box-shadow 0.1s ease;
+    touch-action: manipulation; /* Prevents double-tap to zoom on mobile */
 }
 
 #controls-container button:active {
