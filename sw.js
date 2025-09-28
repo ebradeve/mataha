@@ -1,12 +1,10 @@
-const CACHE_NAME = 'maze-game-cache-v1';
+const CACHE_NAME = 'maze-game-cache-v2'; // Bumped version to ensure update
 const urlsToCache = [
     '/',
     '/index.html',
     '/index.css',
     '/index.js',
-    '/manifest.json',
-    '/images/icons/icon-192x192.png',
-    '/images/icons/icon-512x512.png'
+    '/manifest.json'
 ];
 
 self.addEventListener('install', event => {

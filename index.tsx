@@ -23,7 +23,7 @@ const PLAYER_COLOR = '#007BFF';
 const EXIT_COLOR = '#8B4513';
 const WALL_COLOR = '#4CAF50';
 const STAR_COLOR = '#FFD700';
-const ANIMATION_SPEED = 0.15;
+const ANIMATION_SPEED = 0.25; 
 const TOTAL_STARS = 3;
 
 let level = 1;
@@ -36,7 +36,9 @@ let collectedStars = 0;
 let cellSize = 20;
 let mazeSize = 10;
 let gameState: 'start' | 'playing' | 'won' = 'start';
-let isMoving = false;
+let isAnimating = false;
+let currentDirection = { dx: 0, dy: 0 };
+let desiredDirection = { dx: 0, dy: 0 };
 let frameCount = 0;
 let audioCtx: AudioContext | null = null;
 
@@ -112,7 +114,9 @@ function updateStarDisplay() {
 function setupLevel(newLevel: number) {
     level = newLevel;
     gameState = 'playing';
-    isMoving = false;
+    isAnimating = false;
+    currentDirection = { dx: 0, dy: 0 };
+    desiredDirection = { dx: 0, dy: 0 };
     collectedStars = 0;
     
     if (level <= 2) mazeSize = 10;
@@ -154,13 +158,9 @@ function generateMaze() {
         const current = stack[stack.length - 1];
         const neighbors: { pos: Position; wall: 'top' | 'right' | 'bottom' | 'left'; oppositeWall: 'bottom' | 'left' | 'top' | 'right' }[] = [];
 
-        // Top
         if (current.y > 0 && !maze[current.y - 1][current.x].visited) neighbors.push({ pos: { x: current.x, y: current.y - 1 }, wall: 'top', oppositeWall: 'bottom' });
-        // Right
         if (current.x < mazeSize - 1 && !maze[current.y][current.x + 1].visited) neighbors.push({ pos: { x: current.x + 1, y: current.y }, wall: 'right', oppositeWall: 'left' });
-        // Bottom
         if (current.y < mazeSize - 1 && !maze[current.y + 1][current.x].visited) neighbors.push({ pos: { x: current.x, y: current.y + 1 }, wall: 'bottom', oppositeWall: 'top' });
-        // Left
         if (current.x > 0 && !maze[current.y][current.x - 1].visited) neighbors.push({ pos: { x: current.x - 1, y: current.y }, wall: 'left', oppositeWall: 'right' });
 
         if (neighbors.length > 0) {
@@ -175,18 +175,57 @@ function generateMaze() {
     }
 }
 
-function generateStars() {
-    stars = [];
-    const possiblePositions: Position[] = [];
-    for (let y = 0; y < mazeSize; y++) {
-        for (let x = 0; x < mazeSize; x++) {
-            if ((x === player.x && y === player.y) || (x === exit.x && y === exit.y)) {
-                continue;
+
+function findShortestPath(startPos: Position, endPos: Position): Position[] {
+    const queue: Position[] = [startPos];
+    const visited = new Set<string>([`${startPos.x},${startPos.y}`]);
+    const parentMap = new Map<string, Position>();
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (current.x === endPos.x && current.y === endPos.y) {
+            // Reconstruct path
+            const path: Position[] = [];
+            let curr: Position | undefined = endPos;
+            while (curr) {
+                path.unshift(curr);
+                curr = parentMap.get(`${curr.x},${curr.y}`);
             }
-            possiblePositions.push({ x, y });
+            return path;
+        }
+
+        const { x, y } = current;
+        const cell = maze[y][x];
+        const neighbors: Position[] = [];
+        if (!cell.top && y > 0) neighbors.push({ x, y: y - 1 });
+        if (!cell.right && x < mazeSize - 1) neighbors.push({ x: x + 1, y });
+        if (!cell.bottom && y < mazeSize - 1) neighbors.push({ x, y: y + 1 });
+        if (!cell.left && x > 0) neighbors.push({ x: x - 1, y });
+
+        for (const neighbor of neighbors) {
+            const key = `${neighbor.x},${neighbor.y}`;
+            if (!visited.has(key)) {
+                visited.add(key);
+                parentMap.set(key, current);
+                queue.push(neighbor);
+            }
         }
     }
+    return []; // No path found
+}
 
+
+function generateStars() {
+    stars = [];
+    const solutionPath = findShortestPath({ x: 0, y: 0 }, exit);
+    if (solutionPath.length <= 2) {
+        return; // Path is too short, no stars
+    }
+    
+    // Remove start and end from potential star locations
+    const possiblePositions = solutionPath.slice(1, -1);
+    
+    // Shuffle and pick
     for (let i = possiblePositions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [possiblePositions[i], possiblePositions[j]] = [possiblePositions[j], possiblePositions[i]];
@@ -237,7 +276,6 @@ function draw() {
         }
     }
     
-    // Draw Stars (with twinkling animation)
     ctx.fillStyle = STAR_COLOR;
     const twinkle = Math.sin(frameCount * 0.08) * (cellSize * 0.03);
     const starOuterRadius = (cellSize / 4) + twinkle;
@@ -253,17 +291,15 @@ function draw() {
         );
     });
 
-    // Draw exit (with pulsing animation)
     ctx.fillStyle = EXIT_COLOR;
     const pulse = Math.sin(frameCount * 0.05) * (cellSize * 0.05);
     const exitSize = cellSize * 0.8 + pulse;
     const exitOffset = (cellSize - exitSize) / 2;
     ctx.fillRect(exit.x * cellSize + exitOffset, exit.y * cellSize + exitOffset, exitSize, exitSize);
     
-    // Draw player (with breathing animation)
     ctx.fillStyle = PLAYER_COLOR;
     let breath = 0;
-    if (!isMoving) {
+    if (currentDirection.dx === 0 && currentDirection.dy === 0 && !isAnimating) {
         breath = Math.sin(frameCount * 0.1) * (cellSize * 0.04);
     }
     const playerRadius = cellSize / 3 + breath;
@@ -272,27 +308,25 @@ function draw() {
     ctx.fill();
 }
 
-function movePlayer(dx: number, dy: number) {
-    initAudio();
-    if (gameState !== 'playing' || isMoving) return;
-    
-    const { x, y } = player;
-    let canMove = false;
-    if (dx === 1 && !maze[y][x].right) canMove = true;
-    if (dx === -1 && !maze[y][x].left) canMove = true;
-    if (dy === 1 && !maze[y][x].bottom) canMove = true;
-    if (dy === -1 && !maze[y][x].top) canMove = true;
+function canMove(pos: Position, dir: { dx: number, dy: number }): boolean {
+    const { x, y } = pos;
+    const cell = maze[y]?.[x];
+    if (!cell) return false;
 
-    if (canMove) {
-        player.x += dx;
-        player.y += dy;
-        isMoving = true;
-        playMoveSound();
-    }
+    if (dir.dx === 1 && !cell.right) return true;
+    if (dir.dx === -1 && !cell.left) return true;
+    if (dir.dy === 1 && !cell.bottom) return true;
+    if (dir.dy === -1 && !cell.top) return true;
+    return false;
+}
+
+function setDirection(dx: number, dy: number) {
+    initAudio();
+    if (gameState !== 'playing') return;
+    desiredDirection = { dx, dy };
 }
 
 function checkGameStatus() {
-    // Star collection
     const starIndex = stars.findIndex(star => star.x === player.x && star.y === player.y);
     if (starIndex > -1) {
         stars.splice(starIndex, 1);
@@ -304,9 +338,10 @@ function checkGameStatus() {
         }
     }
 
-    // Win condition
     if (player.x === exit.x && player.y === exit.y) {
         gameState = 'won';
+        currentDirection = { dx: 0, dy: 0 };
+        desiredDirection = { dx: 0, dy: 0 };
         messageDisplay.textContent = 'لقد فزت! 🎉';
         playWinSound();
         setTimeout(() => setupLevel(level + 1), 1500);
@@ -314,19 +349,43 @@ function checkGameStatus() {
 }
 
 function update() {
-    if (!isMoving) return;
+    // Animate movement from render position to logical position
+    if (isAnimating) {
+        const rdx = player.x - playerRenderPos.x;
+        const rdy = player.y - playerRenderPos.y;
+        
+        const dist = Math.sqrt(rdx*rdx + rdy*rdy);
 
-    const dx = player.x - playerRenderPos.x;
-    const dy = player.y - playerRenderPos.y;
-
-    if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) {
-        playerRenderPos.x = player.x;
-        playerRenderPos.y = player.y;
-        isMoving = false;
-        checkGameStatus();
-    } else {
-        playerRenderPos.x += dx * ANIMATION_SPEED;
-        playerRenderPos.y += dy * ANIMATION_SPEED;
+        if (dist < 0.01) {
+            playerRenderPos.x = player.x;
+            playerRenderPos.y = player.y;
+            isAnimating = false;
+        } else {
+            playerRenderPos.x += rdx * ANIMATION_SPEED;
+            playerRenderPos.y += rdy * ANIMATION_SPEED;
+        }
+        return; // Don't process new moves until animation is done
+    }
+    
+    // When not animating a step, check for next logical move
+    if (gameState === 'playing') {
+        // Check if we should change direction based on user input
+        const isOpposite = desiredDirection.dx === -currentDirection.dx && desiredDirection.dy === -currentDirection.dy;
+        if ((desiredDirection.dx !== 0 || desiredDirection.dy !== 0) && (canMove(player, desiredDirection) || isOpposite)) {
+            currentDirection = { ...desiredDirection };
+        }
+        
+        // Try to move in the current direction
+        if (canMove(player, currentDirection)) {
+            player.x += currentDirection.dx;
+            player.y += currentDirection.dy;
+            isAnimating = true;
+            playMoveSound();
+            checkGameStatus();
+        } else {
+            // Stop if we hit a wall or are at a junction we can't pass through
+            currentDirection = { dx: 0, dy: 0 };
+        }
     }
 }
 
@@ -337,36 +396,22 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-
 window.addEventListener('keydown', (e) => {
     if (gameState === 'playing') {
         e.preventDefault();
         switch (e.key) {
-            case 'ArrowUp':
-            case 'w':
-                movePlayer(0, -1);
-                break;
-            case 'ArrowDown':
-            case 's':
-                movePlayer(0, 1);
-                break;
-            case 'ArrowLeft':
-            case 'a':
-                movePlayer(-1, 0);
-                break;
-            case 'ArrowRight':
-            case 'd':
-                movePlayer(1, 0);
-                break;
+            case 'ArrowUp': case 'w': setDirection(0, -1); break;
+            case 'ArrowDown': case 's': setDirection(0, 1); break;
+            case 'ArrowLeft': case 'a': setDirection(-1, 0); break;
+            case 'ArrowRight': case 'd': setDirection(1, 0); break;
         }
     }
 });
 
-upButton?.addEventListener('click', () => movePlayer(0, -1));
-downButton?.addEventListener('click', () => movePlayer(0, 1));
-leftButton?.addEventListener('click', () => movePlayer(-1, 0));
-rightButton?.addEventListener('click', () => movePlayer(1, 0));
-
+upButton?.addEventListener('click', () => setDirection(0, -1));
+downButton?.addEventListener('click', () => setDirection(0, 1));
+leftButton?.addEventListener('click', () => setDirection(-1, 0));
+rightButton?.addEventListener('click', () => setDirection(1, 0));
 
 window.addEventListener('resize', () => {
     if (gameState === 'playing' || gameState === 'start') {
@@ -374,6 +419,5 @@ window.addEventListener('resize', () => {
     }
 });
 
-// Initial setup
 setupLevel(1);
-gameLoop(); // Start the main game loop
+gameLoop();
